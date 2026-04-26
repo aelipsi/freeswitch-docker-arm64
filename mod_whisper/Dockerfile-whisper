@@ -1,0 +1,192 @@
+FROM --platform=linux/arm64 alpine:3.23.3 AS base
+
+ARG FREESWITCH_VERSION="v1.10.12"
+ARG SOFIA_VERSION="v1.13.17"
+ARG MOD_WHISPER_VERSION="main"
+
+# region pull source
+FROM base AS deps
+
+RUN \
+  apk --no-cache upgrade \
+  && apk --no-cache add \
+    git
+
+RUN \
+  git clone --depth 1 --branch "${FREESWITCH_VERSION}" https://github.com/signalwire/freeswitch /freeswitch \
+  && rm -rf /freeswitch/.git \
+  && git clone --depth 1 --branch "${SOFIA_VERSION}" https://github.com/freeswitch/sofia-sip /libdeps/sofia-sip \
+  && rm -rf /sofia-sip/.git
+
+RUN \
+  git clone --depth 1 -b "${MOD_WHISPER_VERSION}" https://github.com/cyrenity/mod_whisper /mod_whisper \
+  && rm -rf /mod_whisper/.git
+
+# endregion pull source
+# region build sofia
+FROM base AS builder-sofia
+
+COPY --from=deps /libdeps/sofia-sip ./libdeps/sofia-sip
+COPY ./patches/sofia-sip/. ./patches
+
+RUN \
+  apk --no-cache upgrade \
+  && apk add --no-cache \
+    build-base \
+    autoconf \
+    automake \
+    libtool \
+    openssl-dev \
+    glib-dev \
+    lksctp-tools-dev
+
+RUN \
+  cd ./libdeps/sofia-sip \
+  && for i in /patches/*.patch; do patch -p1 < $i; done \
+  && ./bootstrap.sh \
+  && ./configure --prefix=/usr --enable-sctp --with-openssl --without-doxygen --enable-static=no \
+  && make -j$(nproc --all) \
+  && make DESTDIR=/build install
+
+
+FROM base AS builder-freeswitch
+
+COPY --from=deps /freeswitch/ ./app
+COPY --from=deps /mod_whisper/ ./app/src/mod/asr_tts/mod_whisper
+COPY --from=builder-sofia /build/. .
+
+RUN \
+  apk --no-cache upgrade \
+  && apk add --no-cache \
+    build-base \
+    autoconf \
+    automake \
+    libtool \
+    libjpeg-turbo-dev \
+    spandsp3-dev \
+    zlib-dev \
+    sqlite-dev \
+    curl-dev \
+    pcre-dev \
+    speex-dev \
+    speexdsp-dev \
+# mod_enum
+    ldns-dev \
+    libks-dev \
+    libedit-dev \
+    diffutils \
+    nasm \
+    python3-dev \
+    py3-setuptools \
+    linux-headers \
+    util-linux-dev \
+    unixodbc-dev \
+    libpq-dev \
+    mariadb-dev \
+    mpg123-dev \
+    tiff-dev \
+    flite-dev \
+    lua5.3-dev \
+    perl-dev \
+    opus-dev \
+    portaudio-dev \
+# mod_sangoma_codec
+    sngtc_client-dev \
+# mod_shout
+    libshout-dev\
+    lame-dev \
+# mod_snmp
+    net-snmp-dev\
+# mod_sndfile
+    libsndfile-dev
+
+
+RUN \
+apk --no-cache add \
+    curl sed libwebsockets libwebsockets-dev
+
+RUN sed -i -e 's@src/mod/asr_tts/mod_flite/Makefile@src/mod/asr_tts/mod_whisper/Makefile@g' /app/configure.ac
+
+COPY patches/freeswitch /patches/freeswitch
+RUN \
+  cd /app \
+  && for i in /patches/freeswitch/*.patch; do patch -p1 < $i; done    
+
+# Override modules.conf with mine
+COPY mod_whisper/modules.conf /app/modules.conf
+
+# I really don't want these, try to speed things up by removing the others
+RUN sed -i '/^languages\/mod_lua/!{/^languages\//d}' /app/configure.ac
+RUN sed -i '/^asr_tts\/mod_whisper/!{/^asr_tts\//d}' /app/configure.ac
+RUN sed -i '\@libs/xmlrpc-c/@d' /app/configure.ac
+RUN sed -i '\@src/mod/xml_int/@d' /app/configure.ac
+RUN sed -i '\@src/mod/applications/mod_signalwire/Makefile@d' /app/configure.ac
+
+COPY patches/whisper /patches/whisper
+RUN cd ./app/src/mod/asr_tts/mod_whisper \
+  && for i in /patches/whisper/*.patch; do patch -p1 < $i; done
+
+RUN cd /app  && ./bootstrap.sh -j
+RUN cd /app && ./configure \
+    --prefix=/usr \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --enable-fhs \
+    --with-scriptdir=/etc/freeswitch/scripts \
+    --with-rundir=/run/freeswitch \
+    --with-logfiledir=/var/log/freeswitch \
+    --with-dbdir=/var/spool/freeswitch/db \
+    --with-certsdir=/etc/freeswitch/certs \
+    --enable-core-pgsql-support \
+    --enable-system-lua \
+    --disable-libvpx \
+    --disable-libyuv \
+    --without-freetype \
+    --without-png \
+    --with-python3=no
+
+
+RUN \
+  cd /app \
+  && make -j$(nproc) \
+  && make install \
+  && make DESTDIR=/build install \
+  && ldd $(which freeswitch) | cut -d" " -f3 | xargs tar --dereference -cf /build/libs.tar
+
+# endregion build everything else
+# region runtime image
+FROM --platform=linux/arm64 base AS runner
+
+ARG WORKER_USER_ID=499
+
+COPY --from=builder-freeswitch /build/. .
+
+RUN \
+  addgroup -g ${WORKER_USER_ID} freeswitch \
+  && adduser -D -u ${WORKER_USER_ID} -G freeswitch freeswitch \
+  && apk --no-cache upgrade \
+  && apk add --no-cache \
+    opus \
+    libsndfile \
+    lua5.3-libs \
+    libpq \
+    libks \
+    ldns \
+    libwebsockets \
+  && tar -xf libs.tar \
+  && rm libs.tar
+
+# These don't do anything in host mode, but maybe it'll be helpful for you to know what firewall ports to open
+EXPOSE 8021/tcp
+EXPOSE 5060/tcp 5060/udp 5080/tcp 5080/udp
+EXPOSE 5061/tcp 5061/udp 5081/tcp 5081/udp
+EXPOSE 5066/tcp
+EXPOSE 7443/tcp
+EXPOSE 8081/tcp 8082/tcp
+EXPOSE 64535-65535/udp
+EXPOSE 16384-32768/udp
+
+HEALTHCHECK --interval=15s --timeout=5s \
+    CMD  fs_cli -x status | grep -q ^UP || exit 1
+
+CMD ["/usr/bin/freeswitch", "-u", "${WORKER_USER_ID}", "-g", "${WORKER_USER_ID}"]

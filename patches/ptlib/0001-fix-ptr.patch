@@ -1,0 +1,24 @@
+From 68df30caf1590db8f6fa65e2d6fe958f0bd0e20c Mon Sep 17 00:00:00 2001
+From: aelipsi <a@A-COMPUTER.>
+Date: Sun, 22 Mar 2026 17:14:05 -0400
+Subject: [PATCH] fix ptr
+
+---
+ src/ptlib/unix/socket.cxx | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/ptlib/unix/socket.cxx b/src/ptlib/unix/socket.cxx
+index 7ccdeda..e036db7 100644
+--- a/src/ptlib/unix/socket.cxx
++++ b/src/ptlib/unix/socket.cxx
+@@ -1738,7 +1738,7 @@ class NetLinkRouteTableDetector : public PIPSocket::RouteTableDetector
+         struct sockaddr_nl snl;
+         char buf[4096];
+         struct iovec iov = { buf, sizeof buf };
+-        struct msghdr msg = { (void*)&snl, sizeof snl, &iov, 1, NULL, 0, 0};
++        struct msghdr msg = { (void*)&snl, sizeof snl, &iov, 1, 0, NULL, 0, 0, 0};
+ 
+         int status = recvmsg(m_fdLink, &msg, 0);
+         if (status < 0)
+-- 
+2.43.0

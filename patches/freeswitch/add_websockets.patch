@@ -1,0 +1,16 @@
+diff --git a/configure.ac b/configure.ac
+index 469d539..9837a70 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1979,6 +1979,11 @@ else
+ 	AC_MSG_WARN([python3 support disabled, building mod_python3 will fail!])
+ fi
+ 
++PKG_CHECK_MODULES([WEBSOCKETS], [libwebsockets >= 0.0.1],[
++  AM_CONDITIONAL([HAVE_WEBSOCKETS],[true])],[
++  AC_MSG_RESULT([no]); AM_CONDITIONAL([HAVE_WEBSOCKETS],[false])])
++
++
+ # pcap lib for unit-testing
+ AC_MSG_CHECKING(libpcap)
+ AC_CHECK_PROG(HAVE_PCAP_CONFIG,pcap-config,[true],[false])

@@ -1,0 +1,26 @@
+diff --git a/websock_glue.c b/websock_glue.c
+index 4b3862a..50f13b3 100644
+--- a/websock_glue.c
++++ b/websock_glue.c
+@@ -297,10 +297,10 @@ void ws_asr_thread_launch(whisper_t *tech_pvt, switch_memory_pool_t *pool)
+ // thread for handling websocket connection
+ void *SWITCH_THREAD_FUNC ws_asr_thread_run(switch_thread_t *thread, void *obj) {
+ 	whisper_t *context = (whisper_t *) obj;
+-	int n; 
+-	while (context->started == WS_STATE_STARTED && n >= 0) {
+-		n = lws_service(context->lws_context, WS_TIMEOUT_MS);
+-	}
++	int n = 0; 
++	do {
++	   n = lws_service(context->lws_context, WS_TIMEOUT_MS);
++	} while (context->started == WS_STATE_STARTED && n >= 0);
+ 
+ 	lws_context_destroy(context->lws_context);
+ 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CRIT, "Exiting ASR lws_service thread!\n");
+@@ -417,4 +417,4 @@ void whisper_fire_event(whisper_t *context, char * event_subclass) {
+ 			}
+ 
+ 			switch_event_fire(&event);	
+-}
+\ No newline at end of file
++}
