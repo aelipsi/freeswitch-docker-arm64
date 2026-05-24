@@ -8,7 +8,7 @@ For more information, see the upstream project README.
 - [mod_whisper](#mod_whisper)
 
 ## H323 Support
-There is a Dockerfile-H323 here that allows FreeSWITCH to build with mod_h323. Although it does compile, I never ended up testing it at runtime because I found SIP firmware for the phone I was testing with. However, building it was incredibly challenging due to only a vague note in the mod source and a lot of dependencies to compile so I wanted to share my work in the hopes that it might help some hobbiest in the future. I can confirm that FreeSWITCH loads the module properly with the following logs. Anything further [I'm not going to try to fix](https://github.com/freeswitch/freeswitch-sounds/raw/refs/heads/master/en/us/callie/ivr/48000/ivr-file_a_jira.wav). 
+There is a Dockerfile-H323 here that allows FreeSWITCH to build with mod_h323. Although it does compile, I never ended up testing it at runtime because I found SIP firmware for the phone I was testing with. However, building it was incredibly challenging due to only a vague note in the mod source and a lot of dependencies to compile so I wanted to share my work in the hopes that it might help some hobbiest in the future. I can confirm that FreeSWITCH loads the module properly with the following logs. Anything further [I don't have time to try to fix](https://github.com/freeswitch/freeswitch-sounds/raw/refs/heads/master/en/us/callie/ivr/48000/ivr-file_a_jira.wav). 
 
 ```
 2026-04-26 19:48:38.922714 0.00% [DEBUG] mod_h323.cpp:372 ======>FSProcess::Initialise [0x7fa3cc2ab0]
@@ -22,6 +22,6 @@ There is a Dockerfile-H323 here that allows FreeSWITCH to build with mod_h323. A
 ```
 
 ## mod_whisper
-I found a very interesting mod that is able to do automatic speech recognition powered by Whisper. I made some changes to the sample server to instead use whisper.cpp and also updated the build script to include mod_whisper in the build. 
+I found a very interesting mod that is able to do automatic speech recognition powered by Whisper. I made some changes to the sample server to instead use whisper.cpp and also updated the build script to include mod_whisper in the build. Haven't actually tested it yet, so I may push updates to that in the future.
 
 Side note - has anybody ever done an ASR stream on Twitch? I imagine it'd be like an ASMR stream, but instead somebody just says words and checks to see if an automated system recognizes it. Guess it'd have a very niche audience.
