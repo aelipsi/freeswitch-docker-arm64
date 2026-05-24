@@ -171,6 +171,8 @@ RUN \
   && make DESTDIR=/build install \
   && ldd $(which freeswitch) | cut -d" " -f3 | xargs tar --dereference -cf /build/libs.tar
 
+RUN ldd $(which gnugk) | cut -d" " -f3 | xargs tar --dereference -cf /build/h323libs.tar
+
 # endregion build everything else
 # region runtime image
 FROM --platform=linux/arm64 base AS runner
@@ -190,6 +192,8 @@ RUN \
     libpq \
     libks \
     ldns \
+  && tar -xf h323libs.tar \
+  && rm h323libs.tar \
   && tar -xf libs.tar \
   && rm libs.tar
 
@@ -206,5 +210,5 @@ EXPOSE 16384-32768/udp
 HEALTHCHECK --interval=15s --timeout=5s \
     CMD  fs_cli -x status | grep -q ^UP || exit 1
 
-# USER freeswitch
-CMD ["/usr/bin/freeswitch", "-u", "${WORKER_USER_ID}", "-g", "${WORKER_USER_ID}"]
+CMD ["/usr/bin/freeswitch"]
+#, "-u", "freeswitch", "-g", "freeswitch"]

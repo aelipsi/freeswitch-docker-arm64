@@ -189,4 +189,5 @@ EXPOSE 16384-32768/udp
 HEALTHCHECK --interval=15s --timeout=5s \
     CMD  fs_cli -x status | grep -q ^UP || exit 1
 
-CMD ["/usr/bin/freeswitch", "-u", "${WORKER_USER_ID}", "-g", "${WORKER_USER_ID}"]
+CMD ["/usr/bin/freeswitch"] 
+#, "-u", "freeswitch", "-g", "freeswitch"]
